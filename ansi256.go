@@ -4,7 +4,25 @@
 
 package ansi256
 
-import "image/color"
+import (
+	"fmt"
+	"image/color"
+	"sort"
+)
+
+// Raw returns a string using expanded syntax.
+//
+// Your terminal may not support it. In that case, fall back to the palette.
+func Raw(foreground bool, c color.NRGBA) string {
+	cR, cG, cB, _ := c.RGBA()
+	r := int(cR >> 8)
+	g := int(cG >> 8)
+	b := int(cB >> 8)
+	if foreground {
+		return fmt.Sprintf("\033[38;2;%d;%d;%dm ", r, g, b)
+	}
+	return fmt.Sprintf("\033[48;2;%d;%d;%dm ", r, g, b)
+}
 
 // Palette is the color palette to use. The alpha value is ignored.
 type Palette [256]color.NRGBA
@@ -23,16 +41,67 @@ func (p *Palette) ANSI(c color.NRGBA) int {
 	g := int(cG >> 8)
 	b := int(cB >> 8)
 	for i, col := range *p {
-		dR := r - int(col.R)
-		dG := g - int(col.G)
-		dB := b - int(col.B)
-		d := dR*dR + dG*dG + dB*dB
-		if d < delta {
+		if d := getDelta(r, g, b, col); d < delta {
 			delta = d
 			closest = i
 		}
 	}
 	return closest
+}
+
+// Block returns a character with ANSI code to represent the color as closely
+// as possible using a shaded block and two colors. It is important to clear
+// with "\033[0m" after when done.
+func (p *Palette) Block(c color.NRGBA) string {
+	cR, cG, cB, _ := c.RGBA()
+	r := int(cR >> 8)
+	g := int(cG >> 8)
+	b := int(cB >> 8)
+	for i, col := range *p {
+		if r == int(col.R) && g == int(col.G) && b == int(col.B) {
+			// Exact match. Only set the back color and use a white space.
+			return fmt.Sprintf("\033[48;5;%dm ", i)
+		}
+	}
+
+	d := &deltas{}
+	for i, col := range *p {
+		d[i].index = i
+		d[i].delta = getDelta(r, g, b, col)
+	}
+	// Since the algorithm is O(N²), select the 8 closest colors first.
+	sort.Sort(d)
+
+	// Mix two colors at a time with 3 mixes (25%-75%, 50%-50% or 75%-25%). Find
+	// the one with the smallest eucledian distance.
+	closestA := 0
+	closestB := 0
+	char := '░'
+	delta := 1<<31 - 1
+	for i := 0; i < 8; i++ {
+		for j := 0; j < 8; j++ {
+			if i == j {
+				continue
+			}
+			c1 := (*p)[d[i].index]
+			c2 := (*p)[d[j].index]
+			c25 := color.NRGBA{(c1.R + c1.R + c2.R + 1) / 3, (c1.G + c1.G + c2.G + 1) / 3, (c1.B + c1.B + c2.B + 1) / 3, 255}
+			if n := getDelta(r, g, b, c25); n < delta {
+				delta = n
+				closestA = (*d)[i].index
+				closestB = (*d)[j].index
+				char = '░'
+			}
+			c50 := color.NRGBA{(c1.R + c2.R + 1) / 2, (c1.G + c2.G + 1) / 2, (c1.B + c2.B + 1) / 2, 255}
+			if n := getDelta(r, g, b, c50); n < delta {
+				delta = n
+				closestA = (*d)[i].index
+				closestB = (*d)[j].index
+				char = '▒'
+			}
+		}
+	}
+	return fmt.Sprintf("\033[48;5;%dm\033[38;5;%dm%c", closestA, closestB, char)
 }
 
 // Term256 is the default look up table for ANSI color codes according to
@@ -558,3 +627,21 @@ var TermOSX = Palette{
 	{0xE4, 0xE4, 0xE4, 0xFF},
 	{0xEE, 0xEE, 0xEE, 0xFF},
 }
+
+//
+
+func getDelta(r, g, b int, c color.NRGBA) int {
+	dR := r - int(c.R)
+	dG := g - int(c.G)
+	dB := b - int(c.B)
+	return dR*dR + dG*dG + dB*dB
+}
+
+type deltas [256]struct {
+	index int
+	delta int
+}
+
+func (d *deltas) Len() int           { return len(*d) }
+func (d *deltas) Less(i, j int) bool { return (*d)[i].delta < (*d)[j].delta }
+func (d *deltas) Swap(i, j int)      { (*d)[j], (*d)[i] = (*d)[i], (*d)[j] }
