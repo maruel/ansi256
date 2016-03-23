@@ -7,8 +7,21 @@ package ansi256
 import (
 	"fmt"
 	"image/color"
+	"runtime"
 	"sort"
 )
+
+// Default is the default palette to use. It is selected based on the OS.
+var Default *Palette = &Term256
+
+func init() {
+	if runtime.GOOS == "darwin" {
+		Default = &TermOSX
+	} else if runtime.GOOS == "linux" {
+		// That's not really true but it's a first approximation.
+		Default = &TermGnome
+	}
+}
 
 // Raw returns a string using expanded syntax.
 //
