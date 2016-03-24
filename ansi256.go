@@ -77,12 +77,14 @@ func (p *Palette) Block(c color.NRGBA) string {
 		}
 	}
 
-	d := &deltas{}
+	d := make(deltas, 0, 64)
+	const max = 96 * 96 * 3
 	for i, col := range *p {
-		d[i].index = i
-		d[i].delta = getDelta(r, g, b, col)
+		// Only keep deltas below 48²*3 so limit the number of items to sort below.
+		if n := getDelta(r, g, b, col); n < max {
+			d = append(d, item{i, n})
+		}
 	}
-	// Since the algorithm is O(N²), select the 8 closest colors first.
 	sort.Sort(d)
 
 	// Mix two colors at a time with 3 mixes (25%-75%, 50%-50% or 75%-25%). Find
@@ -91,8 +93,13 @@ func (p *Palette) Block(c color.NRGBA) string {
 	closestB := 0
 	char := '░'
 	delta := 1<<31 - 1
-	for i := 0; i < 8; i++ {
-		for j := 0; j < 8; j++ {
+	// Since the algorithm is O(N²), select the 8 closest colors first.
+	count := 8
+	if count > len(d) {
+		count = len(d)
+	}
+	for i := 0; i < count; i++ {
+		for j := 0; j < count; j++ {
 			if i == j {
 				continue
 			}
@@ -101,15 +108,15 @@ func (p *Palette) Block(c color.NRGBA) string {
 			c25 := color.NRGBA{(c1.R + c1.R + c2.R + 1) / 3, (c1.G + c1.G + c2.G + 1) / 3, (c1.B + c1.B + c2.B + 1) / 3, 255}
 			if n := getDelta(r, g, b, c25); n < delta {
 				delta = n
-				closestA = (*d)[i].index
-				closestB = (*d)[j].index
+				closestA = d[i].index
+				closestB = d[j].index
 				char = '░'
 			}
 			c50 := color.NRGBA{(c1.R + c2.R + 1) / 2, (c1.G + c2.G + 1) / 2, (c1.B + c2.B + 1) / 2, 255}
 			if n := getDelta(r, g, b, c50); n < delta {
 				delta = n
-				closestA = (*d)[i].index
-				closestB = (*d)[j].index
+				closestA = d[i].index
+				closestB = d[j].index
 				char = '▒'
 			}
 		}
@@ -906,6 +913,7 @@ var TermGnome = Palette{
 
 //
 
+// getDelta returns the eucledian distance.
 func getDelta(r, g, b int, c color.NRGBA) int {
 	dR := r - int(c.R)
 	dG := g - int(c.G)
@@ -913,11 +921,13 @@ func getDelta(r, g, b int, c color.NRGBA) int {
 	return dR*dR + dG*dG + dB*dB
 }
 
-type deltas [256]struct {
+type deltas []item
+
+type item struct {
 	index int
 	delta int
 }
 
-func (d *deltas) Len() int           { return len(*d) }
-func (d *deltas) Less(i, j int) bool { return (*d)[i].delta < (*d)[j].delta }
-func (d *deltas) Swap(i, j int)      { (*d)[j], (*d)[i] = (*d)[i], (*d)[j] }
+func (d deltas) Len() int           { return len(d) }
+func (d deltas) Less(i, j int) bool { return d[i].delta < d[j].delta }
+func (d deltas) Swap(i, j int)      { d[j], d[i] = d[i], d[j] }
