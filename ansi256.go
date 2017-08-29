@@ -12,7 +12,7 @@ import (
 )
 
 // Default is the default palette to use. It is selected based on the OS.
-var Default *Palette = &Term256
+var Default = &Term256
 
 func init() {
 	if runtime.GOOS == "darwin" {

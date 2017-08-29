@@ -7,15 +7,23 @@ package ansi256
 import (
 	"image/color"
 	"testing"
-
-	"github.com/maruel/ut"
 )
 
 func TestANSI(t *testing.T) {
-	ut.AssertEqual(t, 0, Term256.ANSI(color.NRGBA{}))
-	ut.AssertEqual(t, 0, Term256.ANSI(color.NRGBA{1, 1, 1, 255}))
-	ut.AssertEqual(t, 0, Term256.ANSI(color.NRGBA{255, 255, 255, 0}))
-	ut.AssertEqual(t, 15, Term256.ANSI(color.NRGBA{255, 255, 255, 255}))
-	ut.AssertEqual(t, 15, Term256.ANSI(color.NRGBA{254, 254, 254, 255}))
-	ut.AssertEqual(t, 255, Term256.ANSI(color.NRGBA{0xE5, 0xEE, 0xF0, 255}))
+	data := []struct {
+		expected int
+		c        color.NRGBA
+	}{
+		{0, color.NRGBA{}},
+		{0, color.NRGBA{1, 1, 1, 255}},
+		{0, color.NRGBA{255, 255, 255, 0}},
+		{15, color.NRGBA{255, 255, 255, 255}},
+		{15, color.NRGBA{254, 254, 254, 255}},
+		{255, color.NRGBA{0xE5, 0xEE, 0xF0, 255}},
+	}
+	for i, line := range data {
+		if v := Term256.ANSI(line.c); v != line.expected {
+			t.Fatalf("%d: Term256.ANSI(%v) = %d, expected %d", i, line.c, v, line.expected)
+		}
+	}
 }
