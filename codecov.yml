@@ -7,7 +7,7 @@
 # https://docs.codecov.io/docs/coverage-configuration
 coverage:
   precision: 1
-  range: "20...80"
+  range: "40...80"
   round: nearest
   status:
     patch:
