@@ -1,7 +1,7 @@
-ansi256
-=======
+# ansi256
 
-[![GoDoc](https://godoc.org/github.com/maruel/ansi256?status.svg)](https://godoc.org/github.com/maruel/ansi256)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/maruel/ansi256)](https://pkg.go.dev/github.com/maruel/ansi256)
+[![Coverage Status](https://codecov.io/gh/maruel/panicparse/graph/badge.svg)](https://codecov.io/gh/maruel/ansi256)
 
 Small library and tools to calibrate and use an ANSI 256 color terminal.
 
